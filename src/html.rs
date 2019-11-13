@@ -1,11 +1,43 @@
-mod dom;
-
 use std::collections::HashMap;
 
 #[derive(Debug)]
+pub struct Node {
+    children: Vec<Node>,
+    node_type: NodeType,
+}
+
+#[derive(Debug)]
+enum NodeType {
+    Text(String),
+    Element(ElementData),
+}
+
+#[derive(Debug)]
+struct ElementData {
+    tag_name: String,
+    attributes: AttrMap,
+}
+
+pub type AttrMap = HashMap<String, String>;
+
+pub fn text(data: String) -> Node {
+    Node { children: Vec::new(), node_type: NodeType::Text(data) }
+}
+
+pub fn elem(name: String, attrs: AttrMap, children: Vec<Node>) -> Node {
+    Node {
+        children: children,
+        node_type: NodeType::Element(ElementData {
+            tag_name: name,
+            attributes: attrs,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct Parser {
-    pub pos: usize,
-    pub input: String,
+    pos: usize,
+    input: String,
 }
 
 
@@ -58,7 +90,7 @@ impl Parser {
     }
 
     // Parse a single node.
-    fn parse_node(&mut self) -> dom::Node {
+    fn parse_node(&mut self) -> Node {
         match self.next_char() {
             '<' => self.parse_element(),
             _   => self.parse_text()
@@ -66,12 +98,12 @@ impl Parser {
     }
 
     // Parse a text node.
-    fn parse_text(&mut self) -> dom::Node {
-        dom::text(self.consume_while(|c| c != '<'))
+    fn parse_text(&mut self) -> Node {
+        text(self.consume_while(|c| c != '<'))
     }
 
     // Parse a single element, including its open tag, contents, and closing tag.
-    fn parse_element(&mut self) -> dom::Node {
+    fn parse_element(&mut self) -> Node {
         // Opening tag.
         assert!(self.consume_char() == '<');
         let tag_name = self.parse_tag_name();
@@ -87,7 +119,7 @@ impl Parser {
         assert!(self.parse_tag_name() == tag_name);
         assert!(self.consume_char() == '>');
 
-        return dom::elem(tag_name, attrs, children);
+        return elem(tag_name, attrs, children);
     }
 
     // Parse a single name="value" pair.
@@ -108,7 +140,7 @@ impl Parser {
     }
 
     // Parse a list of name="value" pairs, separated by whitespace.
-    fn parse_attributes(&mut self) -> dom::AttrMap {
+    fn parse_attributes(&mut self) -> AttrMap {
         let mut attributes = HashMap::new();
         loop {
             self.consume_whitespace();
@@ -122,7 +154,7 @@ impl Parser {
     }
 
     // Parse a sequence of sibling nodes.
-    fn parse_nodes(&mut self) -> Vec<dom::Node> {
+    fn parse_nodes(&mut self) -> Vec<Node> {
         let mut nodes = Vec::new();
         loop {
             self.consume_whitespace();
@@ -133,17 +165,16 @@ impl Parser {
         }
         return nodes;
     }
+}
 
+// Parse an HTML document and return the root element.
+pub fn parse(source: String) -> Node {
+    let mut nodes = Parser { pos: 0, input: source }.parse_nodes();
 
-    // Parse an HTML document and return the root element.
-    pub fn parse(source: String) -> dom::Node {
-        let mut nodes = Parser { pos: 0, input: source }.parse_nodes();
-
-        // If the document contains a root element, just return it. Otherwise, create one.
-        if nodes.len() == 1 {
-            nodes.swap_remove(0)
-        } else {
-            dom::elem("html".to_string(), HashMap::new(), nodes)
-        }
+    // If the document contains a root element, just return it. Otherwise, create one.
+    if nodes.len() == 1 {
+        nodes.swap_remove(0)
+    } else {
+        elem("html".to_string(), HashMap::new(), nodes)
     }
 }
