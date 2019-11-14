@@ -1,12 +1,15 @@
-struct Stylesheet {
+#[derive(Debug)]
+pub struct Stylesheet {
     rules: Vec<Rule>,
 }
 
+#[derive(Debug)]
 struct Rule {
     selectors: Vec<Selector>,
     declarations: Vec<Declaration>,
 }
 
+#[derive(Debug)]
 enum Selector {
     Simple(SimpleSelector),
 }
@@ -24,27 +27,32 @@ impl Selector {
     }
 }
 
+#[derive(Debug)]
 struct SimpleSelector {
     tag_name: Option<String>,
     id: Option<String>,
     class: Vec<String>,
 }
 
+#[derive(Debug)]
 struct Declaration {
     name: String,
     value: Value,
 }
 
+#[derive(Debug)]
 enum Value {
     Keyword(String),
     Length(f32, Unit),
     ColorValue(Color),
 }
 
+#[derive(Debug)]
 enum Unit {
     Px,
 }
 
+#[derive(Debug)]
 struct Color {
     r: u8,
     g: u8,
@@ -84,7 +92,9 @@ impl Parser {
 
     // Consume characters until `test` returns false.
     fn consume_while<F>(&mut self, test: F) -> String
-    where F: Fn(char) -> bool {
+    where
+        F: Fn(char) -> bool,
+    {
         let mut result = String::new();
         while !self.eof() && test(self.next_char()) {
             result.push(self.consume_char());
@@ -97,7 +107,9 @@ impl Parser {
         let mut rules = Vec::new();
         loop {
             self.consume_whitespace();
-            if self.eof() { break }
+            if self.eof() {
+                break;
+            }
             rules.push(self.parse_rule());
         }
         rules
@@ -107,7 +119,7 @@ impl Parser {
     fn parse_rule(&mut self) -> Rule {
         Rule {
             selectors: self.parse_selectors(),
-            declarations: self.parse_declarations()
+            declarations: self.parse_declarations(),
         }
     }
 
@@ -118,18 +130,25 @@ impl Parser {
             selectors.push(Selector::Simple(self.parse_simple_selector()));
             self.consume_whitespace();
             match self.next_char() {
-                ',' => { self.consume_char(); self.consume_whitespace(); }
+                ',' => {
+                    self.consume_char();
+                    self.consume_whitespace();
+                }
                 '{' => break, // start of declarations
-                c   => panic!("Unexpected character {} in selector list", c)
+                c => panic!("Unexpected character {} in selector list", c),
             }
         }
         // Return selectors with highest specificity first, for use in matching.
-        selectors.sort_by(|a,b| b.specificity().cmp(&a.specificity()));
+        selectors.sort_by(|a, b| b.specificity().cmp(&a.specificity()));
         return selectors;
     }
 
     fn parse_simple_selector(&mut self) -> SimpleSelector {
-        let mut selector = SimpleSelector { tag_name: None, id: None, class: Vec::new() };
+        let mut selector = SimpleSelector {
+            tag_name: None,
+            id: None,
+            class: Vec::new(),
+        };
         while !self.eof() {
             match self.next_char() {
                 '#' => {
@@ -147,7 +166,7 @@ impl Parser {
                 c if valid_identifier_char(c) => {
                     selector.tag_name = Some(self.parse_identifier());
                 }
-                _ => break
+                _ => break,
             }
         }
         return selector;
@@ -186,9 +205,9 @@ impl Parser {
 
     fn parse_value(&mut self) -> Value {
         match self.next_char() {
-            '0'...'9' => self.parse_length(),
+            '0'..='9' => self.parse_length(),
             '#' => self.parse_color(),
-            _ => Value::Keyword(self.parse_identifier())
+            _ => Value::Keyword(self.parse_identifier()),
         }
     }
 
@@ -198,8 +217,8 @@ impl Parser {
 
     fn parse_float(&mut self) -> f32 {
         let s = self.consume_while(|c| match c {
-            '0'...'9' | '.' => true,
-            _ => false
+            '0'..='9' | '.' => true,
+            _ => false,
         });
         s.parse().unwrap()
     }
@@ -207,24 +226,44 @@ impl Parser {
     fn parse_unit(&mut self) -> Unit {
         match self.parse_identifier().to_ascii_lowercase().as_str() {
             "px" => Unit::Px,
-            _ => panic!("not a valid unit!")
+            _ => panic!("not a valid unit!"),
         }
+    }
+
+    fn parse_color(&mut self) -> Value {
+        assert_eq!('#', self.consume_char());
+        Value::ColorValue(Color {
+            r: self.parse_hex_pair(),
+            g: self.parse_hex_pair(),
+            b: self.parse_hex_pair(),
+            a: 255,
+        })
+    }
+
+    fn parse_hex_pair(&mut self) -> u8 {
+        let s = &self.input[self.pos..self.pos + 2];
+        self.pos += 2;
+        u8::from_str_radix(s, 16).unwrap()
     }
 
     /// Parse a property name or keyword.
     fn parse_identifier(&mut self) -> String {
         self.consume_while(valid_identifier_char)
     }
-
-    fn valid_identifier_char(c: char) -> bool {
-        match c {
-            'a'...'z' | 'A'...'Z' | '0'...'9' | '-' | '_' => true,
-            _ => false,
-        }
-    }
 }
 
+fn valid_identifier_char(c: char) -> bool {
+    match c {
+        'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => true,
+        _ => false,
+    }
+}
 pub fn parse(source: String) -> Stylesheet {
-    let mut parser = Parser { pos: 0, input: source };
-    Stylesheet { rules: parser.parse_rules() }
+    let mut parser = Parser {
+        pos: 0,
+        input: source,
+    };
+    Stylesheet {
+        rules: parser.parse_rules(),
+    }
 }
